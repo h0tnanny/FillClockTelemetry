@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -33,9 +34,18 @@ namespace watch_complete_activity
             cmdDataPick2.Items.Clear();
         }
 
-        private void selectToolStrop_Click(object sender, EventArgs e)
+        private async void selectToolStrop_Click(object sender, EventArgs e)
         {
+            await AddItem();
+        }
+
+        private async Task AddItem()
+        {
+            listBox1.Items.Clear();
+            textBox1.Text = "";
+
             ClearInfo();
+            await EnableBtn(false);
 
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
@@ -49,46 +59,44 @@ namespace watch_complete_activity
 
                 var data = fileValue.Split('\n');
 
-                for (int i = 0; i < data.Length; i++)
-                    listClockTelemetry.Add(data[i]);
-
-                listBox1.Items.Clear();
-                textBox1.Text = "";
-
                 progressBar1.Maximum = data.Length;
                 progressBar1.Visible = true;
 
-                Task.Run(() =>
+                listBox1.BeginUpdate();
+                cmdDataPick1.BeginUpdate();
+                cmdDataPick2.BeginUpdate();
+
+                for (int i = 0; i < data.Length; i++)
                 {
-                    foreach (var item in listClockTelemetry)
-                    {
-                        progressBar1.Value += 1;
-                        this.Text = $"Добавление телеметрии ({progressBar1.Value}/{progressBar1.Maximum})";
+                    await Task.Run(() => { progressBar1.Value = i; });
+                    listBox1.Items.Add(data[i]);
+                    cmdDataPick1.Items.Add(data[i].Split(';')[0]);
+                    cmdDataPick2.Items.Add(data[i].Split(';')[0]);
+                }
 
-                        listBox1.Items.Add(item);
-                        cmdDataPick1.Items.Add(item.Split(';')[0]);
-                        cmdDataPick2.Items.Add(item.Split(';')[0]);
-                    }
+                listBox1.EndUpdate();
+                cmdDataPick1.EndUpdate();
+                cmdDataPick2.EndUpdate();
 
-                    MessageBox.Show("Все данные телеметрии считаны.", "Уведомление");
 
-                    this.Text = "Заполнение телеметрии";
-                    progressBar1.Value = 0;
-                    progressBar1.Visible = false;
+                MessageBox.Show("Все данные телеметрии считаны.", "Уведомление");
 
-                    EnableBtn();
-                });
+                this.Text = "Заполнение телеметрии";
+                progressBar1.Value = 0;
+                progressBar1.Visible = false;
+
+                await EnableBtn(true);
             }
         }
-
-        private async void EnableBtn()
+        
+        private async Task EnableBtn(bool IsState)
         {
-            btnDataSave.Enabled = true;
-            btnEntrySave.Enabled = true;
-            btnFill_a.Enabled = true;
-            btnSearch.Enabled = true;
-            saveAsToolStripMenuItem.Enabled = true;
-            saveToolStripMenuItem.Enabled = true;
+            btnDataSave.Enabled = IsState;
+            btnEntrySave.Enabled = IsState;
+            btnFill_a.Enabled = IsState;
+            btnSearch.Enabled = IsState;
+            saveAsToolStripMenuItem.Enabled = IsState;
+            saveToolStripMenuItem.Enabled = IsState;
         }
 
         private void listBox1_Click(object sender, EventArgs e)
@@ -106,7 +114,7 @@ namespace watch_complete_activity
             if (cmdDataPick1.SelectedIndex != -1 && cmdDataPick2.SelectedIndex != -1 && cmbActivity1.SelectedIndex != -1)
             {
                 ClearLetter(cmdDataPick1.SelectedIndex, cmdDataPick2.SelectedIndex + 1);
-                Task.Run(() => FillActivity(cmdDataPick1.SelectedIndex, cmdDataPick2.SelectedIndex + 1, cmbActivity1.Text));
+                Task.Run(async () => await FillActivity(cmdDataPick1.SelectedIndex, cmdDataPick2.SelectedIndex + 1, $";{cmbActivity1.Text}"));
             }
             else
             {
@@ -120,7 +128,7 @@ namespace watch_complete_activity
             {
                 var index = listBox1.SelectedIndex;
                 //this.listBox1.Items[index] = $"{listClockTelemetry[index]} {cmbActivity2.Text}";
-                this.textBox1.Text += $" {cmbActivity2.Text}";
+                this.textBox1.Text += $";{cmbActivity2.Text}";
                 this.listBox1.Items[index] = textBox1.Text;
             }
             else
@@ -138,7 +146,7 @@ namespace watch_complete_activity
         private void btnFill_a_Click(object sender, EventArgs e)
         {
             ClearLetter(0, listBox1.Items.Count);
-            Task.Run(() => FillActivity(0, listBox1.Items.Count, "a"));
+            Task.Run(async () => await FillActivity(0, listBox1.Items.Count, ";a"));
         }
 
         private void ClearLetter(int start, int end)
@@ -163,18 +171,21 @@ namespace watch_complete_activity
             }
         }
 
-        private void FillActivity(int start, int end, string typeActivity)
+        private async Task FillActivity(int start, int end, string typeActivity)
         {
             progressBar1.Value = start;
             progressBar1.Maximum = end;
             progressBar1.Visible = true;
 
+            listBox1.BeginUpdate();
+
             for (int i = start; i < end; i++)
             {
-                listBox1.Items[i] = $"{listBox1.Items[i]} {typeActivity}";
-                progressBar1.Value += 1;
-                this.Text = $"Изменение данных телеметрии ({progressBar1.Value}/{progressBar1.Maximum})";
+                listBox1.Items[i] = $"{listBox1.Items[i]}{typeActivity}";
+                progressBar1.Value = i;
             }
+
+            listBox1.EndUpdate();
 
             MessageBox.Show("Все данные телеметрии изменены", "Уведомление");
 
